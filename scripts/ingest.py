@@ -1,8 +1,10 @@
 import os
 from google import genai
+from dotenv import load_dotenv
+load_dotenv()
 
 # Use GOOGLE_API_KEY env var in production instead of hardcoding
-client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY", "AIzaSyD_JEORfXadd6FxBcKzAawbF-Z7pA0iOCw"))
+client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
 # Upload the file to the Files API (supports up to 2GB).
 # The Python SDK has no "file_search_stores"; use the file in generate_content instead.
