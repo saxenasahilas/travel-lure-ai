@@ -1,26 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf9f6;
+  --foreground: #2d2d2d;
+  --accent: #c2410c;
+  --accent-deep: #9a3412;
+  --glass: rgba(255, 255, 255, 0.25);
+  --glass-border: rgba(255, 255, 255, 0.4);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-serif), ui-serif, Georgia, serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Mesh gradient: cream → soft sunset orange */
+.bg-mesh {
+  background-color: #faf9f6;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(253, 186, 116, 0.4), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(251, 146, 60, 0.15), transparent),
+    radial-gradient(ellipse 50% 30% at 0% 80%, rgba(254, 215, 170, 0.3), transparent);
+  min-height: 100vh;
 }

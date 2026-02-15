@@ -1,65 +1,147 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useCallback, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import SearchHub from "@/components/SearchHub";
+import { type ConciergeOption } from "@/components/ResultBento";
+import ResultTabs, { type SecretSource } from "@/components/ResultTabs";
+import ActionBridge from "@/components/ActionBridge";
 
 export default function Home() {
+  const [whereTo, setWhereTo] = useState("");
+  const [vibe, setVibe] = useState("");
+  const [dark, setDark] = useState(false);
+  const [options, setOptions] = useState<ConciergeOption[] | null>(null);
+  const [secretSource, setSecretSource] = useState<SecretSource | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+
+  const hasSearched = options !== null;
+  const compact = hasSearched;
+
+  useEffect(() => {
+    if (!navigator?.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
+    );
+  }, []);
+
+  const submit = useCallback(async () => {
+    const vibeTrim = vibe.trim();
+    if (!vibeTrim) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/lure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: whereTo.trim() || undefined,
+          vibe: vibeTrim,
+          latitude: userLocation?.lat,
+          longitude: userLocation?.lng,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error ?? "Request failed");
+        setOptions(null);
+        setSecretSource(null);
+        return;
+      }
+      const list = data?.options ?? [];
+      setOptions(Array.isArray(list) ? list : []);
+      setSecretSource(data?.secretSource ?? null);
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    } catch {
+      setError("Something went wrong");
+      setOptions(null);
+      setSecretSource(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [whereTo, vibe, userLocation]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div
+      className={`min-h-screen transition-colors duration-300 ${dark ? "bg-[#1A1A1A]" : "bg-[#FAF9F6]"}`}
+    >
+      {/* Theme toggle */}
+      <button
+        type="button"
+        onClick={() => setDark((d) => !d)}
+        className={`fixed top-4 right-4 z-10 w-10 h-10 rounded-full border font-sans text-sm transition-colors ${
+          dark ? "bg-white/10 border-white/20 text-white" : "bg-black/5 border-black/10 text-[#1A1A1A]"
+        }`}
+        aria-label="Toggle dark mode"
+      >
+        {dark ? "☀" : "◇"}
+      </button>
+
+      <div className="snap-y snap-mandatory overflow-y-auto min-h-screen">
+        <section
+          className={`snap-start flex flex-col ${compact ? "" : "min-h-screen snap-always"}`}
+        >
+          <SearchHub
+            whereTo={whereTo}
+            onWhereToChange={setWhereTo}
+            vibe={vibe}
+            onVibeChange={setVibe}
+            onSubmit={submit}
+            loading={loading}
+            compact={compact}
+            dark={dark}
+          />
+        </section>
+
+        <AnimatePresence>
+          {options && options.length > 0 && (
+            <motion.section
+              ref={resultsRef}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="snap-start snap-always min-h-screen py-16 px-6"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+              <div className="max-w-5xl mx-auto">
+                <h2
+                  className={`text-2xl font-serif font-medium text-center mb-8 ${
+                    dark ? "text-white" : "text-[#1A1A1A]"
+                  }`}
+                >
+                  Your 3 options
+                </h2>
+                <ResultTabs
+                  options={options}
+                  secretSource={secretSource}
+                  locationName={options[0]?.name ?? ""}
+                  dark={dark}
+                />
+                <div className="mt-12">
+                  <ActionBridge
+                    selectedOptionName={options[0]?.name ?? null}
+                    dark={dark}
+                  />
+                </div>
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {error && (
+        <p
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 text-sm font-sans px-4 py-2 rounded-lg ${
+            dark ? "bg-red-900/80 text-white" : "bg-red-100 text-red-800"
+          }`}
+        >
+          {error}
+        </p>
+      )}
     </div>
   );
 }
