@@ -100,8 +100,9 @@ No markdown. Output only the JSON object.`;
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
+        { role: 'user', content: 'My name is Abhinav. I am from Bareilly, India. I am looking for a weekend getaway. I have a budget of ₹5000. I am looking for a place that is not too far from my city. I am interested in places with a spiritual vibe. I am a solo traveler.' }
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-70b-versatile',
       response_format: { type: 'json_object' },
     });
 

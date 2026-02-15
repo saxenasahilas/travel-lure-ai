@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ConciergeOption } from "./ResultBento";
 import ResultBento from "./ResultBento";
+import VibeFeed from "./VibeFeed";
+import BudgetTree from "./BudgetTree";
 
 export type SecretSource = {
   guideName: string;
@@ -12,33 +14,26 @@ export type SecretSource = {
 };
 
 const TABS = [
-  { id: "fixer", label: "The Fixer", subtitle: "Hard Data" },
-  { id: "secret", label: "The Secret", subtitle: "Curation" },
-  { id: "vibe", label: "The Vibe", subtitle: "Video" },
+  { id: "fixer", label: "The Fixer", subtitle: "Budget & Data" },
+  { id: "secret", label: "The Secret", subtitle: "Curated" },
+  { id: "vibe", label: "The Vibe", subtitle: "Shorts" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
-/** Example Shorts IDs for India travel; can be replaced by API later. */
-const SHORTS_PLACEHOLDERS = [
-  "jNQXAC9IVRw",
-  "kxLb4o3bJ2M",
-  "2Vv-BfVoqGg",
-];
-
-type ResultTabsProps = {
+type DiscoveryTabsProps = {
   options: ConciergeOption[];
   secretSource: SecretSource | null;
   locationName: string;
   dark: boolean;
 };
 
-export default function ResultTabs({
+export default function DiscoveryTabs({
   options,
   secretSource,
   locationName,
   dark,
-}: ResultTabsProps) {
+}: DiscoveryTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("fixer");
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +44,8 @@ export default function ResultTabs({
   const cardBg = dark ? "bg-white/5 border-white/10" : "bg-white/90 border-black/10";
   const tabInactive = dark ? "text-white/60 hover:text-white/80" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]/80";
   const tabActive = "text-[#c2410c] font-medium border-b-2 border-[#c2410c]";
+
+  const distance = typeof options[0]?.distanceKm === 'number' ? options[0].distanceKm : 0;
 
   return (
     <div className="w-full" ref={contentRef}>
@@ -97,7 +94,7 @@ export default function ResultTabs({
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
             >
-              <ResultBento options={options} dark={dark} />
+              <ResultBento options={options} dark={dark} budgetTree={<BudgetTree dark={dark} distanceKm={distance} />} />
             </motion.div>
           )}
 
@@ -138,25 +135,7 @@ export default function ResultTabs({
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
             >
-              <p className={`text-sm font-sans mb-4 ${dark ? "text-white/70" : "text-[#1A1A1A]/70"}`}>
-                Shorts for {locationName || "your spot"}
-              </p>
-              <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scroll-smooth">
-                {SHORTS_PLACEHOLDERS.map((id, i) => (
-                  <div
-                    key={id + i}
-                    className="shrink-0 w-[220px] snap-center rounded-xl overflow-hidden border bg-black/5"
-                  >
-                    <iframe
-                      src={`https://www.youtube.com/embed/${id}`}
-                      title={`Shorts ${i + 1}`}
-                      className="w-full aspect-[9/16] max-h-[360px]"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                ))}
-              </div>
+                <VibeFeed locationName={locationName} dark={dark} />
             </motion.div>
           )}
         </AnimatePresence>

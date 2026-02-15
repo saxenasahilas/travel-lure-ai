@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SearchHub from "@/components/SearchHub";
 import { type ConciergeOption } from "@/components/ResultBento";
-import ResultTabs, { type SecretSource } from "@/components/ResultTabs";
+import DiscoveryTabs, { type SecretSource } from "@/components/DiscoveryTabs";
 import ActionBridge from "@/components/ActionBridge";
 
 export default function Home() {
@@ -22,10 +22,17 @@ export default function Home() {
   const compact = hasSearched;
 
   useEffect(() => {
-    if (!navigator?.geolocation) return;
+    if (!navigator?.geolocation) {
+        // Default to Bareilly if geolocation is not available
+        setUserLocation({ lat: 28.3670, lng: 79.4304 });
+        return;
+    };
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {},
+      () => {
+        // Default to Bareilly on error
+        setUserLocation({ lat: 28.3670, lng: 79.4304 });
+      },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
     );
   }, []);
@@ -115,7 +122,7 @@ export default function Home() {
                 >
                   Your 3 options
                 </h2>
-                <ResultTabs
+                <DiscoveryTabs
                   options={options}
                   secretSource={secretSource}
                   locationName={options[0]?.name ?? ""}
