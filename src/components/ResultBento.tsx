@@ -16,6 +16,7 @@ export type ConciergeOption = {
     food: string;
     travel: string;
   };
+  redditInsight: string;
 };
 
 type ResultBentoProps = {
@@ -71,6 +72,10 @@ export default function ResultBento({ options, dark }: ResultBentoProps) {
             <p className={`text-xs font-sans border-t pt-3 ${dark ? "border-white/10 text-white/60" : "border-black/10 text-[#1A1A1A]/60"}`}>
               <span className={`font-medium ${dark ? "text-[#c2410c]" : "text-[#c2410c]"}`}>Major Expenses: </span>
               'approx INR {opt.majorExpenses.stay} for stay, INR {opt.majorExpenses.food} for food, INR {opt.majorExpenses.travel} for travel'
+            </p>
+            <p className={`text-xs font-sans border-t pt-3 ${dark ? "border-white/10 text-white/60" : "border-black/10 text-[#1A1A1A]/60"}`}>
+              <span className={`font-medium ${dark ? "text-[#c2410c]" : "text-[#c2410c]"}`}>Insight:{' '} </span>
+              {opt.redditInsight}
             </p>
           </div>
         </motion.article>
