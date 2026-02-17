@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Groq } from 'groq-sdk';
+import { tavily } from '@tavily/core' // Ensure you've installed: npm install @tavily/core
+
+// --- Updated Types ---
 
 export type ConciergeOption = {
   name: string;
@@ -7,164 +10,130 @@ export type ConciergeOption = {
   funFact: string;
   liveTemp: string;
   distanceKm: string | number;
-  topHostel: string;
+  topProperties: string;
   iconicCafe: string;
+  // New specific fields
+  dailyBudget: string; 
+  majorExpenses: {
+    stay: string;
+    food: string;
+    travel: string;
+  };
 };
 
-/** Data derived only from the grounded guide (e.g. ILPB.pdf / Italian guide). */
 export type SecretSource = {
   guideName: string;
   tips: string[];
   isFromGuide: boolean;
 };
 
-async function getLiveTemp(placeName: string): Promise<string> {
-  const apiKey = process.env.OPENWEATHERMAP_API_KEY;
-  if (!apiKey) return '—';
-  try {
-    const geoRes = await fetch(
-      `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(placeName)},India&limit=1&appid=${apiKey}`
-    );
-    const geo = await geoRes.json();
-    if (!Array.isArray(geo) || geo.length === 0) return '—';
-    const { lat, lon } = geo[0];
-    const weatherRes = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
-    );
-    const weather = await weatherRes.json();
-    const temp = weather?.main?.temp;
-    if (temp == null) return '—';
-    return `${Math.round(temp)}°C`;
-  } catch {
-    return '—';
-  }
+// --- Helpers ---
+
+/**
+ * Uses Tavily to fetch raw Reddit sentiment and seasonal weather data.
+ */
+async function getTavilyContext(place: string, vibe: string) {
+  const tvly = tavily({ apiKey: process.env.TAVILY_API_KEY });
+  // We search specifically for Reddit sentiment and seasonal weather patterns
+  const query = `reddit travel reviews for ${place} ${vibe} and seasonal weather breakdown`;
+  const response = await tvly.search(query, {
+    searchDepth: "advanced",
+    includeAnswer: true,
+    maxResults: 5,
+  });
+  debugger
+  return response.answer || response.results.map((r: any) => r.content).join('\n');
 }
 
-function normalizeOption(o: Record<string, unknown>): ConciergeOption {
+async function getLiveTemp(placeName: string): Promise<string> {
+  const apiKey = process.env.OPENWEATHERMAP_API_KEY;
+  if (!apiKey || !placeName) return '—';
+  try {
+    const geoRes = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(placeName)},India&limit=1&appid=${apiKey}`);
+    const [geo] = await geoRes.json();
+    if (!geo) return '—';
+    const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${geo.lat}&lon=${geo.lon}&units=metric&appid=${apiKey}`);
+    const weather = await weatherRes.json();
+    return weather?.main?.temp != null ? `${Math.round(weather.main.temp)}°C` : '—';
+  } catch { return '+'; }
+}
+
+function normalizeOption(o: any): ConciergeOption {
   const dist = o?.distanceKm ?? o?.distance;
   return {
     name: String(o?.name ?? '—'),
     zone: String(o?.zone ?? '—'),
-    funFact: String(o?.funFact ?? o?.oneLineHistory ?? o?.history ?? '—'),
+    funFact: String(o?.funFact ?? '—'),
     liveTemp: '—',
     distanceKm: typeof dist === 'number' ? dist : String(dist ?? '—'),
-    topHostel: String(o?.topHostel ?? o?.stay ?? '—'),
-    iconicCafe: String(o?.iconicCafe ?? o?.cafe ?? '—'),
+    topProperties: String(o?.topProperties ?? '—'),
+    iconicCafe: String(o?.iconicCafe ?? '—'),
+    dailyBudget: String(o?.dailyBudget ?? '—'),
+    majorExpenses: {
+      stay: String(o?.majorExpenses?.stay ?? '—'),
+      food: String(o?.majorExpenses?.food ?? '—'),
+      travel: String(o?.majorExpenses?.travel ?? '—'),
+    },
   };
 }
 
+// --- Main Route Handler ---
+
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Missing GROQ_API_KEY in environment' },
-        { status: 500 }
-      );
-    }
+    const groqKey = process.env.GROQ_API_KEY;
+    const { location, vibe, latitude, longitude } = await req.json();
 
-    const body = await req.json();
-    const location = (body?.location ?? '').trim();
-    const vibe = (body?.vibe ?? '').trim();
-    const latitude = body?.latitude != null ? Number(body.latitude) : null;
-    const longitude = body?.longitude != null ? Number(body.longitude) : null;
+    if (!vibe) return NextResponse.json({ error: "Vibe required" }, { status: 400 });
 
-    if (!vibe) {
-      return NextResponse.json(
-        { error: "Missing 'vibe' in request body" },
-        { status: 400 }
-      );
-    }
+    // 1. FETCH TAVILY CONTEXT (Items 6 & 7 on your list)
+    // This gives the AI "raw" data from Reddit before it answers.
+    const rawSearchData = await getTavilyContext(location || "India", vibe);
 
-    const hasCoords = typeof latitude === 'number' && typeof longitude === 'number' && !Number.isNaN(latitude) && !Number.isNaN(longitude);
-    const geoContext = hasCoords
-      ? `User's current coordinates: ${latitude}, ${longitude}. For each option set "distanceKm" to approximate km from user (number or string).`
-      : 'User location unknown. Set "distanceKm" as approximate km from a sensible center (number or string).';
+    const groq = new Groq({ apiKey: groqKey });
 
-    const mode = location
-      ? `Geography: Ground the search in "${location}" only. Return 3 distinct options in or near this place.`
-      : 'Mode: National Discovery. User left "Where to?" empty. Suggest 3 distinct options anywhere in India that match the vibe.';
+    // 2. UPDATED SYSTEM PROMPT
+    // Change this line in your code:
+    const systemPrompt = `You are a professional travel fixer. Provide 100% data, 0% fluff. 
+    - Use the Search Context to find actual currency values (INR) for costs.
+    - Do NOT return Reddit subscriber counts. Instead, extract real user "trip reports" from the context.
+    - Output the response in JSON format with 4 options.
+    - Schema Requirement:
+      { 
+        "options": [{ 
+          "name", "zone", "funFact", "distanceKm", "topProperties", "iconicCafe",
+          "dailyBudget": "Estimated total per day in INR",
+          "majorExpenses": {
+            "stay": "Avg cost of hostel/dorm",
+            "food": "Avg cost for 3 meals at dhabas/cafes",
+            "travel": "Cost of scooty rental or local rickshaws"
+          }
+        }],
+        "secretSource": { "guideName": "L'itinerario nelle pianure", "tips": ["2-3 specific money-saving hacks from the search context"], "isFromGuide": true }
+      }`;
 
-    const groq = new Groq({ apiKey });
-    const systemPrompt = `You are a professional travel fixer. Provide 100% data, 0% fluff.
-- No adjectives like "hidden," "serene," or "mystical." Use only proper nouns and metrics.
-- Return a single JSON object with two keys:
-  1) "options": an array of exactly 3 items. Each item: "name", "zone", "funFact", "distanceKm" (number or string), "topHostel", "iconicCafe".
-  2) "secretSource": object containing ONLY content that could come from a premium Italian travel guide (e.g. Lonely Planet Italy / L'itinerario nelle pianure). Use: "guideName": "L'itinerario nelle pianure", "tips": [ 2-4 short, punchy 1% tips for this location/vibe—insider advice a printed guide would give ], "isFromGuide": true.
-- For cities like Rishikesh or Varanasi, use zone to distinguish area (e.g. "Tapovan (Hippy)" vs "Ghats (Spiritual)").
-No markdown. Output only the JSON object.`;
 
-    const userPrompt = `${mode} Vibe: ${vibe}. ${geoContext}`;
-
-    const chatCompletion = await groq.chat.completions.create({
+    // 3. AI GENERATION WITH LIVE CONTEXT
+    const completion = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: 'user', content: `Context: ${rawSearchData}. Vibe: ${vibe}. Location: ${location || 'Anywhere India'}` },
       ],
       model: 'llama-3.3-70b-versatile',
       response_format: { type: 'json_object' },
     });
 
-    const content = chatCompletion.choices[0]?.message?.content;
-    if (!content) {
-      return NextResponse.json(
-        { error: 'Empty response from model' },
-        { status: 502 }
-      );
-    }
+    const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+    let options = (parsed.options || []).slice(0, 3).map(normalizeOption);
 
-    let parsed: unknown;
-    try {
-      const cleaned = content.replace(/```json|```/g, '').trim();
-      parsed = JSON.parse(cleaned);
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid JSON from model', raw: content.slice(0, 200) },
-        { status: 502 }
-      );
-    }
+    // 4. WEATHER ENRICHMENT
+    const weatherTarget = location || options[0]?.name;
+    const currentTemp = await getLiveTemp(weatherTarget);
+    options = options.map((o: any) => ({ ...o, liveTemp: currentTemp }));
 
-    const rawOptions = (parsed as { options?: unknown[] })?.options;
-    const list = Array.isArray(rawOptions) ? rawOptions : Array.isArray(parsed) ? parsed : [];
-    const options: ConciergeOption[] = list.slice(0, 3).map((o: Record<string, unknown>) => normalizeOption(o));
+    return NextResponse.json({ options, secretSource: parsed.secretSource });
 
-    if (options.length === 0) {
-      return NextResponse.json(
-        { error: 'Model did not return options', raw: content.slice(0, 300) },
-        { status: 502 }
-      );
-    }
-
-    const placeForWeather = location || options[0]?.name || '';
-    const liveTemp = placeForWeather ? await getLiveTemp(placeForWeather) : '—';
-    const optionsWithTemp: ConciergeOption[] = options.map((o) => ({ ...o, liveTemp }));
-
-    const rawSecret = (parsed as { secretSource?: unknown })?.secretSource;
-    const secretSource: SecretSource =
-      rawSecret && typeof rawSecret === 'object' && !Array.isArray(rawSecret)
-        ? {
-            guideName: String((rawSecret as { guideName?: unknown }).guideName ?? "L'itinerario nelle pianure"),
-            tips: Array.isArray((rawSecret as { tips?: unknown }).tips)
-              ? ((rawSecret as { tips: unknown[] }).tips).map((t) => String(t)).filter(Boolean)
-              : [],
-            isFromGuide: Boolean((rawSecret as { isFromGuide?: unknown }).isFromGuide),
-          }
-        : {
-            guideName: "L'itinerario nelle pianure",
-            tips: [],
-            isFromGuide: false,
-          };
-
-    return NextResponse.json({ options: optionsWithTemp, secretSource });
-  } catch (error) {
-    console.error('[lure]', error);
-    return NextResponse.json(
-      {
-        error: 'Lure request failed',
-        ...(process.env.NODE_ENV === 'development' &&
-          error instanceof Error && { details: error.message }),
-      },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

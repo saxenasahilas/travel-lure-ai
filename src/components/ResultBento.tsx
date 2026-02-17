@@ -8,8 +8,14 @@ export type ConciergeOption = {
   funFact: string;
   liveTemp: string;
   distanceKm: string | number;
-  topHostel: string;
+  topProperties: string;
   iconicCafe: string;
+  dailyBudget: string;
+  majorExpenses: {
+    stay: string;
+    food: string;
+    travel: string;
+  };
 };
 
 type ResultBentoProps = {
@@ -51,17 +57,20 @@ export default function ResultBento({ options, dark }: ResultBentoProps) {
               </div>
               <div>
                 <span className="text-[#c2410c] font-medium block mb-0.5">Hostel</span>
-                <span>{opt.topHostel}</span>
+                <span>{opt.topProperties}</span>
               </div>
               <div>
                 <span className="text-[#c2410c] font-medium block mb-0.5">Cafe</span>
                 <span>{opt.iconicCafe}</span>
               </div>
             </div>
-
             <p className={`text-xs font-sans border-t pt-3 ${dark ? "border-white/10 text-white/60" : "border-black/10 text-[#1A1A1A]/60"}`}>
-              <span className={`font-medium ${dark ? "text-[#c2410c]" : "text-[#c2410c]"}`}>Fun fact: </span>
-              {opt.funFact}
+              <span className={`font-medium ${dark ? "text-[#c2410c]" : "text-[#c2410c]"}`}>Daily Budget: </span>
+              'approx INR {opt.dailyBudget} per day'
+            </p>
+            <p className={`text-xs font-sans border-t pt-3 ${dark ? "border-white/10 text-white/60" : "border-black/10 text-[#1A1A1A]/60"}`}>
+              <span className={`font-medium ${dark ? "text-[#c2410c]" : "text-[#c2410c]"}`}>Major Expenses: </span>
+              'approx INR {opt.majorExpenses.stay} for stay, INR {opt.majorExpenses.food} for food, INR {opt.majorExpenses.travel} for travel'
             </p>
           </div>
         </motion.article>
