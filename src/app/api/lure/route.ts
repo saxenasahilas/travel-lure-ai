@@ -12,13 +12,17 @@ export type ConciergeOption = {
   distanceKm: string | number;
   topProperties: string;
   iconicCafe: string;
-  dailyBudget: string; 
+  dailyBudget: string;
   majorExpenses: {
     stay: string;
     food: string;
     travel: string;
   };
-  redditInsight: string; // NEW: Specific field for that raw Reddit quote
+  flashcards: {
+    where: string;
+    when: string;
+    how: string;
+  };
 };
 
 export type SecretSource = {
@@ -42,7 +46,7 @@ function cleanSearchContent(text: string): string {
     /Reddit Rules Privacy Policy/gi,
     /Reddit, Inc\. © \d{4}/gi
   ];
-  
+
   let cleaned = text;
   noisePatterns.forEach(pattern => {
     cleaned = cleaned.replace(pattern, '');
@@ -54,7 +58,7 @@ async function getTavilyContext(place: string, vibe: string) {
   const tvly = tavily({ apiKey: process.env.TAVILY_API_KEY });
   // Focus query on "trip reports" to avoid landing pages that trigger bot-walls
   const query = `detailed trip report reddit for ${place} ${vibe} travel 2025 2026`;
-  
+
   const response = await tvly.search(query, {
     searchDepth: "advanced",
     includeAnswer: true,
@@ -65,7 +69,7 @@ async function getTavilyContext(place: string, vibe: string) {
   const rawContext = response.results
     .map((r: any) => `Source: ${r.url} | Content: ${cleanSearchContent(r.content)}`)
     .join('\n\n');
-    
+
   return rawContext;
 }
 
@@ -84,6 +88,23 @@ async function getLiveTemp(placeName: string): Promise<string> {
 
 function normalizeOption(o: any): ConciergeOption {
   const dist = o?.distanceKm ?? o?.distance;
+
+  // More robust flashcard handling
+  let cards = o?.flashcards;
+
+  // If cards are missing or not an object, try to reconstruct from old fields or use better defaults
+  if (!cards || typeof cards !== 'object') {
+    cards = {
+      where: "Exploring the best spots for you...",
+      when: "Any time is a good time!",
+      how: "Check local transport options."
+    };
+
+    // Attempt to salvage data if it exists in weird formats
+    if (typeof o?.redditInsight === 'string') cards.where = o.redditInsight;
+    if (Array.isArray(o?.redditInsights) && o.redditInsights[0]) cards.where = o.redditInsights[0];
+  }
+
   return {
     name: String(o?.name ?? '—'),
     zone: String(o?.zone ?? '—'),
@@ -93,7 +114,11 @@ function normalizeOption(o: any): ConciergeOption {
     topProperties: String(o?.topProperties ?? '—'),
     iconicCafe: String(o?.iconicCafe ?? '—'),
     dailyBudget: String(o?.dailyBudget ?? '—'),
-    redditInsight: String(o?.redditInsight ?? 'No recent social proof found.'),
+    flashcards: {
+      where: String(cards.where || "Specific location info unavailable."),
+      when: String(cards.when || "Best time info unavailable."),
+      how: String(cards.how || "Transport info unavailable.")
+    },
     majorExpenses: {
       stay: String(o?.majorExpenses?.stay ?? '—'),
       food: String(o?.majorExpenses?.food ?? '—'),
@@ -117,13 +142,17 @@ export async function POST(req: NextRequest) {
     const systemPrompt = `You are a professional travel fixer. Provide 100% data, 0% fluff. 
     - Use Search Context to find actual currency values (INR) for costs.
     - IGNORE any context containing "CAPTCHA" or "humanity check".
-    - For each option, extract ONE specific, raw user quote/insight from the Search Context.
-    - Format redditInsight exactly as: "[quote] (Source: r/[SubredditName])".
+    - EXTRACT 3 specific insights from the context into a "flashcards" object:
+      1. "where": Best specific area/town to stay or visit (e.g. "Stay in Old Manali near the bridge").
+      2. "when": Best time/season or specific days to visit (e.g. "Early October for apples, avoid July monsoon").
+      3. "how": Best insider tip on transport or logistics (e.g. "Rent a scooty for 500/day, skip the taxi").
+    - Format flashcards as an OBJECT: { "where": "...", "when": "...", "how": "..." }.
     - Output exactly 3 options in JSON.
     - Schema:
       { 
         "options": [{ 
-          "name", "zone", "funFact", "distanceKm", "topProperties", "iconicCafe", "redditInsight",
+          "name", "zone", "funFact", "distanceKm", "topProperties", "iconicCafe", 
+          "flashcards": { "where": "string", "when": "string", "how": "string" },
           "dailyBudget": "approx INR [total]",
           "majorExpenses": { "stay", "food", "travel" }
         }],
