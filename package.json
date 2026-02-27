@@ -10,12 +10,24 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@langchain/core": "^1.1.27",
+    "@langchain/groq": "^1.1.2",
+    "@langchain/langgraph": "^1.1.5",
+    "@react-google-maps/api": "^2.20.8",
     "@tavily/core": "^0.7.1",
+    "@types/mapbox-gl": "^3.4.1",
+    "date-fns": "^4.1.0",
     "framer-motion": "^12.34.0",
     "groq-sdk": "^0.37.0",
+    "lucide-react": "^0.575.0",
+    "mapbox-gl": "^3.19.0",
     "next": "16.1.6",
+    "pdf-parse": "^1.1.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-day-picker": "^9.13.2",
+    "react-dom": "19.2.3",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

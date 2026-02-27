@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import { MapPin, Calendar, Compass, Sparkles, ChevronRight } from "lucide-react";
 
 export type ConciergeOption = {
   name: string;
@@ -7,7 +9,7 @@ export type ConciergeOption = {
   funFact: string;
   liveTemp: string;
   distanceKm: string | number;
-  topProperties: string;
+  topProperties: { name: string; type: string }[];
   iconicCafe: string;
   dailyBudget: string;
   majorExpenses: {
@@ -100,13 +102,29 @@ export default function ResultBento({ options, dark }: ResultBentoProps) {
                       </div>
                       <div className={`p-2 rounded-lg ${dark ? "bg-slate-800/50" : "bg-gray-50"}`}>
                         <span className="block text-[10px] uppercase text-gray-400 font-bold tracking-wider">Top Stay</span>
-                        <span className={`text-sm font-medium ${textColor} truncate`}>{opt.topProperties}</span>
+                        <span className={`text-sm font-medium ${textColor} truncate`}>
+                          {Array.isArray(opt.topProperties) ? opt.topProperties.map(p => p.name).join(", ") : opt.topProperties}
+                        </span>
                       </div>
                       <div className={`p-2 rounded-lg ${dark ? "bg-slate-800/50" : "bg-gray-50"} col-span-2`}>
                         <span className="block text-[10px] uppercase text-gray-400 font-bold tracking-wider">Fun Fact</span>
                         <span className={`text-sm italic ${subTextColor}`}>{opt.funFact}</span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Action Button for Planner */}
+                  <div className="px-4 pb-4">
+                    <Link href={`/planner/${opt.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                      <button className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] ${dark
+                        ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+                        : "bg-black text-white shadow-lg shadow-black/10"
+                        }`}>
+                        <Sparkles className="w-4 h-4" />
+                        Plan Detailed Itinerary
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </Link>
                   </div>
                 </motion.div>
               )}
@@ -142,7 +160,7 @@ export default function ResultBento({ options, dark }: ResultBentoProps) {
           />
         </div>
       </div>
-    </div>
+    </div >
   );
 }
 
